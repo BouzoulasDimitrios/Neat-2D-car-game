@@ -34,8 +34,8 @@ mainCarImage = pygame.transform.scale(mainCarImage, (carWidth, carHeight))
 
 font = pygame.font.Font(None, 24)
 
-# Rectangle class
-class Rectangle(pygame.sprite.Sprite):
+# Player class
+class Player(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
         self.image = pygame.Surface((30, 50))
@@ -155,10 +155,6 @@ def generate_wave(Ycoordinate = -40):
         the car objects are spaced out with a minimal space distance
     
     '''
-    # waves = [
-    #     [20, 100, 180, 260, 340, 420, 500],
-    #     [60, 140, 220, 300, 380, 460, 520]
-    # ]
 
     randomNum = random.randint(0,60)
     waves = [20, 100, 180, 260, 340, 420, 500]
@@ -174,11 +170,12 @@ def generate_wave(Ycoordinate = -40):
 
     return car_wave
 
+
 def obstacleUpdate(obstacles, score):
     '''
         removes obstacles that are out of view 
     '''
-    if(obstacles[0].y > 1225):
+    if(obstacles.sprites()[0].rect.y > 1225):
         del obstacles[:6]
         score += 1
         return obstacles, score
@@ -190,67 +187,88 @@ def mainLoop():
 
     main_rect_x = SCREENWIDTH // 1.95
     main_rect_y = SCREENHEIGHT - 50
-
+    
     rightBoundary = sideBoundaries(height = 200, width =4, x = 502, y = 700)
     leftBoundary  = sideBoundaries(height = 200, width =4, x = -2, y = 700)
 
-    ObstacleList = []
+    ObstacleList = pygame.sprite.Group()
+    # ObstacleList = (generate_wave(160) + generate_wave(340)+ generate_wave(520))
 
-    ObstacleList = generate_wave(160) + generate_wave(340)+ generate_wave(520)
-    
-    score = 0
+    ObstacleList.add(generate_wave(160))
+    ObstacleList.add(generate_wave(340))
+    ObstacleList.add(generate_wave(520))
 
-    running = True
+    # testSprite = pygame.sprite.Group()
+    # testSprite.add(generate_wave())
+
     clock = pygame.time.Clock()
 
-    progress = 0
+    cars = pygame.sprite.Group()
 
-    car = Rectangle(main_rect_x, main_rect_y)
+    for i in range(30):
+        cars.add(Player(main_rect_x, main_rect_y))
+
+    progress = 0
+    score = 0
+    running = True
+
+    obstaclesAndBoundaries = pygame.sprite.Group()
+
 
     # Game loop
     while running:
+    
+        screen.blit(background, (-50,0))   
 
         for event in pygame.event.get(): # End Game
             if event.type == pygame.QUIT: running = False
 
-        screen.fill(BLACK)                 
-        screen.blit(background, (-50,0))   
+        # # generate new wave of obstacles
+        # if ObstacleList[len(ObstacleList) - 1].rect.y > 160: 
+        #     ObstacleList.extend(generate_wave())
 
-        #draw main 
-        screen.blit(car.image, [car.rect.x, car.rect.y, car.rect.width, car.rect.height])
-        
         # generate new wave of obstacles
-        if ObstacleList[len(ObstacleList) - 1].rect.y > 160: ObstacleList.extend(generate_wave())
+        if ObstacleList.sprites()[-1].rect.y > 160: 
+            ObstacleList.add(generate_wave())
 
         for obstacle in ObstacleList:
             obstacle.move_down()
-            screen.blit(obstacle.image, obstacle.rect)
-            progress += 0.001
-
-        obstaclesAndBoundaries = [rightBoundary, leftBoundary] + ObstacleList
+            # screen.blit(obstacle.image, obstacle.rect)
         
-
-        car.sensorData = car.get_collision(obstaclesAndBoundaries)
-        values = list(car.sensorData)
-
-        if event.type == pygame.KEYDOWN:
-            
-            if event.key == pygame.K_LEFT:
-                car.move_left()
-            
-            if event.key == pygame.K_RIGHT:
-                car.move_right()
+        progress += 0.001
+        ObstacleList.draw(screen)
 
 
-        for obstacle in obstaclesAndBoundaries: # end game for colission
-            if car.rect.colliderect(obstacle.rect): 
-                running = False
+        # obstaclesAndBoundaries = [rightBoundary, leftBoundary] + ObstacleList
+        # obstaclesAndBoundaries = pygame.sprite.Group()
+        # obstaclesAndBoundaries = obstaclesAndBoundaries.add(ObstacleList)
+        # obstaclesAndBoundaries = obstaclesAndBoundaries.add(    rightBoundary   )
+        # obstaclesAndBoundaries = obstaclesAndBoundaries.add(    leftBoundary    )
 
 
-        # text_surface2 = font.render(intersection_text, True, WHITE)
+        #draw main 
+        for car in cars:
+
+            # car.sensorData = car.get_collision(obstaclesAndBoundaries)
+
+            if event.type == pygame.KEYDOWN:
+                
+                if event.key == pygame.K_LEFT:
+                    car.move_left()
+                
+                if event.key == pygame.K_RIGHT:
+                    car.move_right()
+
+            # for obstacle in obstaclesAndBoundaries: # end game for colission
+            #     if car.rect.colliderect(obstacle.rect): 
+            #         running = False
+
+
+
+        cars.draw(screen)
+
         txt = f"distance =  {progress}"
         text_ = font.render(txt, True, WHITE)
-        # screen.blit(text_surface2, (10, 30))
         screen.blit(text_, (10, 60))
 
         # check for colission
@@ -263,12 +281,5 @@ def mainLoop():
     return 
 
 if __name__ == '__main__':
-    mainLoop()
-
-
-
-    # Quit the game
-    
+    mainLoop()    
     pygame.quit()
-
-
