@@ -135,8 +135,8 @@ class car(pygame.sprite.Sprite):
         self.y += 2
         self.rect = self.image.get_rect(center = (self.x, self.y))
     
-    # def __del__(self) -> None:
-    #     print('was deleted')
+    def __del__(self) -> None:
+        print('was deleted')
 
 
 class sideBoundaries(car):
@@ -171,16 +171,20 @@ def generate_wave(Ycoordinate = -40):
     return car_wave
 
 
-def obstacleUpdate(obstacles, score):
+def obstacleUpdate(obstacles):
     '''
         removes obstacles that are out of view 
     '''
-    if(obstacles.sprites()[0].rect.y > 1225):
-        del obstacles[:6]
-        score += 1
-        return obstacles, score
+    if(obstacles.sprites()[0].rect.y > 1000):
+        
+        del obstacles.sprites()[:6]
+
+        for i in obstacles.sprites()[:5]:
+            i.kill()
+
+        return obstacles
     
-    return obstacles, score
+    return obstacles
 
 
 def mainLoop():
@@ -192,28 +196,21 @@ def mainLoop():
     leftBoundary  = sideBoundaries(height = 200, width =4, x = -2, y = 700)
 
     ObstacleList = pygame.sprite.Group()
-    # ObstacleList = (generate_wave(160) + generate_wave(340)+ generate_wave(520))
-
     ObstacleList.add(generate_wave(160))
     ObstacleList.add(generate_wave(340))
     ObstacleList.add(generate_wave(520))
-
-    # testSprite = pygame.sprite.Group()
-    # testSprite.add(generate_wave())
 
     clock = pygame.time.Clock()
 
     cars = pygame.sprite.Group()
 
-    for i in range(30):
+    for i in range(3):
         cars.add(Player(main_rect_x, main_rect_y))
 
     progress = 0
-    score = 0
     running = True
 
     obstaclesAndBoundaries = pygame.sprite.Group()
-
 
     # Game loop
     while running:
@@ -223,33 +220,24 @@ def mainLoop():
         for event in pygame.event.get(): # End Game
             if event.type == pygame.QUIT: running = False
 
-        # # generate new wave of obstacles
-        # if ObstacleList[len(ObstacleList) - 1].rect.y > 160: 
-        #     ObstacleList.extend(generate_wave())
-
         # generate new wave of obstacles
         if ObstacleList.sprites()[-1].rect.y > 160: 
             ObstacleList.add(generate_wave())
 
         for obstacle in ObstacleList:
             obstacle.move_down()
-            # screen.blit(obstacle.image, obstacle.rect)
         
         progress += 0.001
         ObstacleList.draw(screen)
 
-
-        # obstaclesAndBoundaries = [rightBoundary, leftBoundary] + ObstacleList
-        # obstaclesAndBoundaries = pygame.sprite.Group()
-        # obstaclesAndBoundaries = obstaclesAndBoundaries.add(ObstacleList)
-        # obstaclesAndBoundaries = obstaclesAndBoundaries.add(    rightBoundary   )
-        # obstaclesAndBoundaries = obstaclesAndBoundaries.add(    leftBoundary    )
-
+        obstaclesAndBoundaries.add(rightBoundary)
+        obstaclesAndBoundaries.add(leftBoundary)
+        obstaclesAndBoundaries.add(ObstacleList)
 
         #draw main 
         for car in cars:
 
-            # car.sensorData = car.get_collision(obstaclesAndBoundaries)
+            car.sensorData = car.get_collision(obstaclesAndBoundaries)
 
             if event.type == pygame.KEYDOWN:
                 
@@ -259,10 +247,9 @@ def mainLoop():
                 if event.key == pygame.K_RIGHT:
                     car.move_right()
 
-            # for obstacle in obstaclesAndBoundaries: # end game for colission
-            #     if car.rect.colliderect(obstacle.rect): 
-            #         running = False
-
+            for obstacle in obstaclesAndBoundaries: # end game for colission
+                if car.rect.colliderect(obstacle.rect): 
+                    running = False
 
 
         cars.draw(screen)
@@ -272,7 +259,7 @@ def mainLoop():
         screen.blit(text_, (10, 60))
 
         # check for colission
-        ObstacleList, score = obstacleUpdate(ObstacleList, score)
+        ObstacleList = obstacleUpdate(ObstacleList)
 
         # Update the display
         pygame.display.flip()
@@ -282,4 +269,7 @@ def mainLoop():
 
 if __name__ == '__main__':
     mainLoop()    
+    print("ended")
     pygame.quit()
+    print("ended2")
+    
