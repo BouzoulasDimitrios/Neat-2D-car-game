@@ -4,6 +4,10 @@ import pygame
 import math
 import pygame.mask
 import random
+import numba 
+
+# debugging
+import cProfile
 
 # Initialize Pygame
 pygame.init()
@@ -43,8 +47,8 @@ class Player(pygame.sprite.Sprite):
         self.x = x
         self.y = y
         self.rect = self.image.get_rect(center=(x, y))
-        self.color = GREEN
         self.sensorData = []
+
 
     def get_collision(self, obstacles):
 
@@ -69,9 +73,15 @@ class Player(pygame.sprite.Sprite):
         
         colissions = []
 
-        for end_coordinate in end_cooridnates:
+        obstacle_coords = [(obstacle.rect.centerx, obstacle.rect.centery) for obstacle in obstacles]
 
-            colission = self.check_collision(start_coorinate, end_coordinate, obstacles)
+        for end_coordinate in end_cooridnates:
+            
+            x1, y1 = start_coorinate
+            x2, y2 = end_coordinate
+    
+            colission = self.check_collision(x1= int(x1), x2= int(x2), y1= int(y1), y2= int(y2), obstacles= obstacle_coords)#, obstacles = obstacles)
+
             if colission is not None:
                 pygame.draw.line(screen, (0, 255, 0), start_coorinate, colission)
                 colissions.append(int(math.dist(start_coorinate, colission)))
@@ -90,10 +100,9 @@ class Player(pygame.sprite.Sprite):
         self.x += 1
         self.rect = self.image.get_rect(center = (self.x, self.y))
 
-
-    def check_collision(self, start, end, obstacles):
-        x1, y1 = start
-        x2, y2 = end
+    @staticmethod
+    @numba.jit(nopython = False)    
+    def check_collision(x1, y1, x2, y2, obstacles):
 
         dx = x2 - x1
         dy = y2 - y1
@@ -109,16 +118,12 @@ class Player(pygame.sprite.Sprite):
         for i in range(int(num_steps+1)):
             x = x1 + i * step_x
             y = y1 + i * step_y
-
-            # Check for overlap with each obstacle
-            for obstacle in obstacles:
-                if obstacle.rect.collidepoint(x, y):
-                    return int(x), int(y)  # Return the overlapping coordinates
                 
-        return end  # No overlap found
-    
-    # def __del__(self) -> None:
-    #     print('was deleted')
+            for obstacle_x, obstacle_y in obstacles:
+                if obstacle_x - 15 <= x <= obstacle_x + 15 and obstacle_y - 25 <= y <= obstacle_y + 25:
+                    return int(x), int(y)  # Return the overlapping coordinates
+
+        return None # No overlap found
 
 
 # Rectangle class
@@ -129,14 +134,13 @@ class car(pygame.sprite.Sprite):
         self.x = x
         self.y = y
         self.rect = self.image.get_rect(center=(x, y))
-        self.color = RED
 
     def move_down(self):
         self.y += 2
         self.rect = self.image.get_rect(center = (self.x, self.y))
     
-    def __del__(self) -> None:
-        print('was deleted')
+    # def __del__(self) -> None:
+    #     print('was deleted')
 
 
 class sideBoundaries(car):
@@ -164,7 +168,7 @@ def generate_wave(Ycoordinate = -40):
 
     car_wave = []
 
-    for x_car_coordinate in waves:#waves[random.randint(0, 1)]:
+    for x_car_coordinate in waves:
         car_ = car(x_car_coordinate, Ycoordinate)
         car_wave.append(car_)
 
@@ -175,16 +179,14 @@ def obstacleUpdate(obstacles):
     '''
         removes obstacles that are out of view 
     '''
-    if(obstacles.sprites()[0].rect.y > 1000):
+    if(obstacles.sprites()[0].rect.y > 1050):
         
-        del obstacles.sprites()[:6]
-
-        for i in obstacles.sprites()[:5]:
+        for i in obstacles.sprites()[:6] :
             i.kill()
 
-        return obstacles
+        return 
     
-    return obstacles
+    return 
 
 
 def mainLoop():
@@ -204,7 +206,7 @@ def mainLoop():
 
     cars = pygame.sprite.Group()
 
-    for i in range(3):
+    for _ in range(50):
         cars.add(Player(main_rect_x, main_rect_y))
 
     progress = 0
@@ -237,7 +239,9 @@ def mainLoop():
         #draw main 
         for car in cars:
 
-            car.sensorData = car.get_collision(obstaclesAndBoundaries)
+
+            # if len(obstaclesAndBoundaries)>12:
+            car.sensorData = car.get_collision(obstaclesAndBoundaries.sprites()[:36])
 
             if event.type == pygame.KEYDOWN:
                 
@@ -258,18 +262,16 @@ def mainLoop():
         text_ = font.render(txt, True, WHITE)
         screen.blit(text_, (10, 60))
 
-        # check for colission
-        ObstacleList = obstacleUpdate(ObstacleList)
+        obstacleUpdate(ObstacleList)
 
         # Update the display
         pygame.display.flip()
-        clock.tick(30)        
+        clock.tick(60)        
 
     return 
 
 if __name__ == '__main__':
     mainLoop()    
-    print("ended")
+    # cProfile.run('mainLoop()') # used for debugging
     pygame.quit()
-    print("ended2")
     
