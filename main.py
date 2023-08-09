@@ -6,6 +6,11 @@ import pygame.mask
 import random
 import numba 
 
+# neat
+import neat
+import numpy as np
+import os
+
 # debugging
 import cProfile
 
@@ -92,16 +97,16 @@ class Player(pygame.sprite.Sprite):
         return colissions
 
     def move_left(self):
-        self.x -= 1
+        self.x -= 2
         self.rect = self.image.get_rect(center=(self.x, self.y))
         
     
     def move_right(self):
-        self.x += 1
+        self.x += 2
         self.rect = self.image.get_rect(center = (self.x, self.y))
 
     @staticmethod
-    @numba.jit(nopython = False)    
+    @numba.jit(nopython = True)    
     def check_collision(x1, y1, x2, y2, obstacles):
 
         dx = x2 - x1
@@ -123,7 +128,7 @@ class Player(pygame.sprite.Sprite):
                 if obstacle_x - 15 <= x <= obstacle_x + 15 and obstacle_y - 25 <= y <= obstacle_y + 25:
                     return int(x), int(y)  # Return the overlapping coordinates
 
-        return None # No overlap found
+        return x2, y2 # No overlap found
 
 
 # Rectangle class
@@ -162,11 +167,9 @@ def generate_wave(Ycoordinate = -40):
 
     randomNum = random.randint(0,60)
     waves = [20, 100, 180, 260, 340, 420, 500]
-    
-    for i in range(len(waves)):
-        waves[i] += randomNum
-
     car_wave = []
+
+    for i in range(len(waves)): waves[i] += randomNum
 
     for x_car_coordinate in waves:
         car_ = car(x_car_coordinate, Ycoordinate)
@@ -179,17 +182,27 @@ def obstacleUpdate(obstacles):
     '''
         removes obstacles that are out of view 
     '''
+
     if(obstacles.sprites()[0].rect.y > 1050):
-        
-        for i in obstacles.sprites()[:6] :
-            i.kill()
+        for i in obstacles.sprites()[:6]: i.kill()
 
         return 
     
     return 
 
 
-def mainLoop():
+def mainLoop(genomes, config):
+        
+    maxDistances = [281, 331, 409, 409, 331, 281]    
+    obstaclesAndBoundaries = pygame.sprite.Group()
+    cars = pygame.sprite.Group()
+    clock = pygame.time.Clock()
+    alive = []  
+    nets = []
+    ge = []
+
+    running = True
+    progress = 0
 
     main_rect_x = SCREENWIDTH // 1.95
     main_rect_y = SCREENHEIGHT - 50
@@ -202,32 +215,28 @@ def mainLoop():
     ObstacleList.add(generate_wave(340))
     ObstacleList.add(generate_wave(520))
 
-    clock = pygame.time.Clock()
+    for id, genome in genomes:
+        genome.fitness = 0  # start with fitness level of 0
+        net = neat.nn.FeedForwardNetwork.create(genome, config)
+        nets.append(net)
+        cars.add(Player(main_rect_x, main_rect_y))    
+        ge.append(genome)
+        alive.append(True)
 
-    cars = pygame.sprite.Group()
-
-    for _ in range(50):
-        cars.add(Player(main_rect_x, main_rect_y))
-
-    progress = 0
-    running = True
-
-    obstaclesAndBoundaries = pygame.sprite.Group()
 
     # Game loop
     while running:
     
         screen.blit(background, (-50,0))   
 
-        for event in pygame.event.get(): # End Game
+        for event in pygame.event.get(): 
             if event.type == pygame.QUIT: running = False
 
         # generate new wave of obstacles
-        if ObstacleList.sprites()[-1].rect.y > 160: 
-            ObstacleList.add(generate_wave())
+        if ObstacleList.sprites()[-1].rect.y > 160: ObstacleList.add(generate_wave())
 
-        for obstacle in ObstacleList:
-            obstacle.move_down()
+        # move obstacle cars down
+        for obstacle in ObstacleList: obstacle.move_down()
         
         progress += 0.001
         ObstacleList.draw(screen)
@@ -236,25 +245,43 @@ def mainLoop():
         obstaclesAndBoundaries.add(leftBoundary)
         obstaclesAndBoundaries.add(ObstacleList)
 
-        #draw main 
-        for car in cars:
+        running = False
 
+        for x, car in enumerate(cars):
 
-            # if len(obstaclesAndBoundaries)>12:
-            car.sensorData = car.get_collision(obstaclesAndBoundaries.sprites()[:36])
+            ge[x].fitness = progress 
 
-            if event.type == pygame.KEYDOWN:
-                
-                if event.key == pygame.K_LEFT:
-                    car.move_left()
-                
-                if event.key == pygame.K_RIGHT:
-                    car.move_right()
+            car.sensorData = car.get_collision(obstaclesAndBoundaries)
+            values = list(car.sensorData)
 
-            for obstacle in obstaclesAndBoundaries: # end game for colission
-                if car.rect.colliderect(obstacle.rect): 
-                    running = False
+            # values normalization
+            for i, v in enumerate(values): values[i] = v/maxDistances[i]
 
+            # move car based on genome output
+            output = nets[x].activate(values)
+            movement = np.argmax(output)
+            if movement == 0: car.move_left()
+            elif movement == 2: car.move_right() 
+
+            for obstacle in obstaclesAndBoundaries.sprites(): 
+                running = True
+                if car.rect.colliderect(obstacle.rect):  alive[x] = False
+                    # continue
+
+            # # single player mode 
+            # car.sensorData = car.get_collision(obstaclesAndBoundaries.sprites()[:36])
+            # if event.type == pygame.KEYDOWN:
+            #     if event.key == pygame.K_LEFT: car.move_left()
+            #     if event.key == pygame.K_RIGHT: car.move_right()
+
+        
+        # remove crashed cars
+        for x in reversed(range(0, len(alive))):
+            if not alive[x]:
+                del alive[x]
+                cars.sprites()[x].kill()
+                del ge[x]
+                del nets[x]
 
         cars.draw(screen)
 
@@ -270,8 +297,34 @@ def mainLoop():
 
     return 
 
+def run_neat(config_file):
+
+    # Load configuration.
+    config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction, neat.DefaultSpeciesSet, neat.DefaultStagnation, config_file)
+
+    # Create the population, which is the top-level object for a NEAT run.
+    p = neat.Population(config)
+    p = neat.Checkpointer.restore_checkpoint('./neat-checkpoint-370')
+
+    # Add a stdout reporter to show progress in the terminal.
+    p.add_reporter(neat.StdOutReporter(True))
+    stats = neat.StatisticsReporter()
+    
+    p.add_reporter(stats)
+    p.add_reporter(neat.Checkpointer(10))
+
+    winner = p.run(mainLoop, 100000)
+
+    # Display the winning genome.
+    print('\nBest genome:\n{!s}'.format(winner))
+
+    winner_net = neat.nn.FeedForwardNetwork.create(winner, config)
+
+
 if __name__ == '__main__':
-    mainLoop()    
+    local_dir = os.path.dirname(__file__)
+    config_path = os.path.join(local_dir, './config.txt')
+    run_neat(config_path)
     # cProfile.run('mainLoop()') # used for debugging
     pygame.quit()
     
