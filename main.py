@@ -22,7 +22,7 @@ SCREENWIDTH, SCREENHEIGHT = 500, 800
 screen = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT))
 pygame.display.set_caption("Distance Sensor Demo")
 
-background = pygame.image.load('./road.png')
+background = pygame.image.load('./resources/road.png')
 background = pygame.transform.scale(background, (600, 1000))
 
 
@@ -35,10 +35,10 @@ GREEN = (0, 255, 0)
 carWidth = 30  
 carHeight = 50  
 
-car_image = pygame.image.load("./obstacleCar.png") 
+car_image = pygame.image.load("./resources/obstacleCar.png") 
 car_image = pygame.transform.scale(car_image, (carWidth, carHeight))
 
-mainCarImage = pygame.image.load("./mainCar.png") 
+mainCarImage = pygame.image.load("./resources/mainCar.png") 
 mainCarImage = pygame.transform.scale(mainCarImage, (carWidth, carHeight))
 
 font = pygame.font.Font(None, 24)
@@ -97,12 +97,12 @@ class Player(pygame.sprite.Sprite):
         return colissions
 
     def move_left(self):
-        self.x -= 2
+        self.x -= 1
         self.rect = self.image.get_rect(center=(self.x, self.y))
         
     
     def move_right(self):
-        self.x += 2
+        self.x += 1
         self.rect = self.image.get_rect(center = (self.x, self.y))
 
     @staticmethod
@@ -285,7 +285,7 @@ def mainLoop(genomes, config):
 
         cars.draw(screen)
 
-        txt = f"distance =  {progress}"
+        txt = "distance =  %.3f alive = %.0f" %(progress, len(alive))
         text_ = font.render(txt, True, WHITE)
         screen.blit(text_, (10, 60))
 
@@ -304,7 +304,7 @@ def run_neat(config_file):
 
     # Create the population, which is the top-level object for a NEAT run.
     p = neat.Population(config)
-    p = neat.Checkpointer.restore_checkpoint('./neat-checkpoint-370')
+    p = neat.Checkpointer.restore_checkpoint('./resources/neat-checkpoint-370')
 
     # Add a stdout reporter to show progress in the terminal.
     p.add_reporter(neat.StdOutReporter(True))
@@ -323,7 +323,7 @@ def run_neat(config_file):
 
 if __name__ == '__main__':
     local_dir = os.path.dirname(__file__)
-    config_path = os.path.join(local_dir, './config.txt')
+    config_path = os.path.join(local_dir, './resources/config.txt')
     run_neat(config_path)
     # cProfile.run('mainLoop()') # used for debugging
     pygame.quit()
