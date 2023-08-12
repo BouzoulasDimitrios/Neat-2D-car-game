@@ -1,6 +1,4 @@
 pygame
-math
 numba
-neat
+neat-python==0.92
 numpy
-os
